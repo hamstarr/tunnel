@@ -1,0 +1,105 @@
+#!/bin/sh
+# Tunnel
+
+# Configure
+LOCAL_HOST=127.0.0.1;
+USERNAME="your_username";
+
+# set your remote address and SSH port.
+TUNNEL_PORT="2022"
+REMOTE_HOST="my.homedomainorip.com -p $TUNNEL_PORT";
+
+TUNNEL_AFP="";
+TUNNEL_HTTP="";
+TUNNEL_ARD="";
+TUNNEL_PROXY="";
+OPEN_AFP="";
+OPEN_ARD="";
+SUD="";
+
+function usage
+{
+  echo "Usage: tunnel.sh -p -w -f -r | [ -h | --help ]"
+  echo "       -p   Socks proxy for secure browsing. Be sure to configure your browser to use it"
+  echo "            the Socks Proxy through port 8081 and to forward DNS through socks (about:config)"
+  echo "       -w   Tunnel Port 80 through SSH Tunnel to web server on the remote host"
+  echo "       -f   Apple File share with the remote host"
+  echo "       -r   Apple Screen Share with the remote host"
+  echo "       -h   shows this Usage guide\n"
+}
+
+function tun_proxy
+{
+  TUNNEL_PROXY="-D 8081";
+  echo "Connecting to secure proxy";
+  echo "Make sure you have your browser configured!";
+}
+
+function tun_web
+{
+  TUNNEL_HTTP="-L 80:$LOCAL_HOST:80";
+  SUD="sudo";
+}
+
+function tun_afp
+{
+  TUNNEL_AFP="-L 22548:$LOCAL_HOST:548";
+  echo "Connecting Remote Finder";
+  OPEN_AFP="open afp://localhost:22548/$USERNAME";
+}
+
+function tun_ard
+{
+  TUNNEL_ARD="-L 5901:$LOCAL_HOST:5900";
+  echo "Connecting Remote Desktop"; 
+  OPEN_ARD="open vnc://localhost:5901";
+}
+
+if [ "$1" = "" ]; then
+  usage;
+  exit;
+else
+  while [ "$#" -gt 0 ]; do # Until you run out of params 
+    case $1 in
+      -p) tun_proxy;
+      ;;
+      -w) tun_web;
+      ;;
+      -f) tun_afp;
+      ;;
+      -r) tun_ard;
+      ;;
+      -h | --help ) usage; exit;
+      ;;
+    esac
+    shift
+  done  
+fi
+
+echo "Opening Tunnel";
+TUNNELS="$TUNNEL_PROXY $TUNNEL_AFP $TUNNEL_HTTP $TUNNEL_ARD";
+
+#$SUD ssh -C2qTnN $TUNNELS $USERNAME@$REMOTE_HOST;
+$SUD ssh -C2TfN $TUNNELS $USERNAME@$REMOTE_HOST;
+
+$OPEN_AFP;
+$OPEN_ARD;
+
+TUN="`lsof -i:$TUNNEL_PORT -t`";
+
+if [ "$TUN" = "" ]; then 
+  echo "The tunnel did not come up :(";
+  exit 1;
+else
+  clear;
+  echo "*********************************************************";
+  echo "* Connected!!                                           *";
+  echo "*********************************************************";
+  echo "* Leave this Terminal window open during your session.  *";
+  echo "* Press ENTER to close the session and kill the tunnel. *";
+  echo "*********************************************************";
+fi
+
+read answer;
+kill $TUN;
+echo "SSH tunnel closed.\n";
